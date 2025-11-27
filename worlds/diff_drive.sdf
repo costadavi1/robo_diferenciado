@@ -72,7 +72,7 @@
       <self_collide>true</self_collide>
       <pose>0 0 0.35 0 0 0</pose>
       <include merge="true">
-        <uri>package://robo_diferenciado/models/diff_drive</uri>
+        <uri>package://robo_diferenciado/models/robo_diferenciado/</uri>
       </include>
 
       <plugin
