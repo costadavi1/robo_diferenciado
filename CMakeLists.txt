@@ -9,7 +9,7 @@ find_package(ament_cmake REQUIRED)
 find_package(xacro REQUIRED)
 
 install(
-  DIRECTORY src launch rviz config worlds models
+  DIRECTORY launch config worlds models
   DESTINATION share/${PROJECT_NAME}
 )
 
