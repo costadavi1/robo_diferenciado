@@ -17,11 +17,11 @@ import os
 from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.actions import IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, RegisterEventHandler
 from launch.conditions import IfCondition
+from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
 
 from launch_ros.actions import Node
 
@@ -35,20 +35,36 @@ def generate_launch_description():
     pkg_project_description = get_package_share_directory('robo_diferenciado')
     pkg_ros_gz_sim = get_package_share_directory('ros_gz_sim')
 
+    urdf_path = os.path.join(pkg_project_description, 'urdf', 'dif_base.urdf.xacro')
+    control_config_path = os.path.join(pkg_project_description, 'config', 'ros2_control.yaml')
+
     # Load the SDF file from "description" package
-    sdf_file  =  os.path.join(pkg_project_description, 'models', 'robo_diferenciado', 'model.sdf')
-    with open(sdf_file, 'r') as infp:
-        robot_desc = infp.read()
+    robot_description = Command(['xacro ', urdf_path])
 
     # Setup to launch the simulator and Gazebo world
     gz_sim = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_ros_gz_sim, 'launch', 'gz_sim.launch.py')),
-        launch_arguments={'gz_args': PathJoinSubstitution([
+        launch_arguments={'gz_args': ['-r ', PathJoinSubstitution([
             pkg_project_gazebo,
             'worlds',
             'diff_drive.sdf'
-        ])}.items(),
+        ])]}.items(),
+    )
+
+    gazebo_spawn_robot = Node(
+        package='ros_gz_sim',
+        executable='create',
+        arguments=['-name', 'robo_diferenciado',
+            '-topic', 'robot_description',
+            # '-x', str(pose_params['x']),
+            # '-y', str(pose_params['y']),
+            # '-z', str(pose_params['z']),
+            # '-R', str(pose_params['roll']),
+            # '-P', str(pose_params['pitch']),
+            # '-Y', str(pose_params['yaw']),
+        ],
+        output='screen'
     )
 
     # Takes the description and joint angles as inputs and publishes the 3D poses of the robot links
@@ -59,8 +75,29 @@ def generate_launch_description():
         output='both',
         parameters=[
             {'use_sim_time': True},
-            {'robot_description': robot_desc},
+            {'robot_description': robot_description},
         ]
+    )
+
+    # Load controllers
+    joint_state_broadcaster_spawner = Node(
+        package='controller_manager',
+        executable='spawner',
+        arguments=['joint_state_broadcaster'],
+    )
+
+    left_wheel_controller_spawner = Node(
+        package='controller_manager',
+        executable='spawner',
+        arguments=['left_wheel_velocity_controller'],
+        parameters=[{'use_sim_time': True}]
+    )
+
+    right_wheel_controller_spawner = Node(
+        package='controller_manager',
+        executable='spawner',
+        arguments=['right_wheel_velocity_controller'],
+        parameters=[{'use_sim_time': True}]
     )
 
     # Visualize in RViz
@@ -82,11 +119,23 @@ def generate_launch_description():
         output='screen'
     )
 
+    delay_joint_state_broadcaster_after_robot_controller_spawner = RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=right_wheel_controller_spawner,
+            on_exit=[joint_state_broadcaster_spawner],
+        )
+    )
+
     return LaunchDescription([
         gz_sim,
+        gazebo_spawn_robot,
+        robot_state_publisher,
         DeclareLaunchArgument('rviz', default_value='true',
                               description='Open RViz.'),
-        bridge,
-        robot_state_publisher,
-        rviz
+        rviz,
+        # bridge,
+        left_wheel_controller_spawner,
+        right_wheel_controller_spawner,
+
+        delay_joint_state_broadcaster_after_robot_controller_spawner,
     ])

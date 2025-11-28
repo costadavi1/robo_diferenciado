@@ -68,7 +68,7 @@
       </link>
     </model>
 
-    <model name="diff_drive">
+    <!-- <model name="diff_drive">
       <self_collide>true</self_collide>
       <pose>0 0 0.35 0 0 0</pose>
       <include merge="true">
@@ -95,7 +95,7 @@
         <odom_frame>diff_drive/odom</odom_frame>
         <robot_base_frame>diff_drive</robot_base_frame>
       </plugin>
-    </model>
+    </model> -->
 
   </world>
 </sdf>
