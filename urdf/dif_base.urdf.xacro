@@ -1,12 +1,28 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="robo_diferenciado">
 
+    <xacro:arg name="wheel_radius" default="0.1"/>
+    <xacro:arg name="wheel_separation" default="0.175"/>
+
     <xacro:include filename="$(find robo_diferenciado)/urdf/diferenciado_robot_model.urdf.xacro"/>
     <xacro:include filename="$(find robo_diferenciado)/urdf/wheels.ros2_control.xacro"/>
 
+    <xacro:robot_diferenciado
+        wheel_radius="$(arg wheel_radius)"
+        wheel_separation="$(arg wheel_separation)"
+        chassis_mass="5.0"
+        chassis_length="0.4"
+        chassis_width="0.3"
+        chassis_height="0.1"
+        wheel_mass="1.0"
+        wheel_width="0.05"
+        caster_radius="0.05"
+        caster_mass="0.5"
+        caster_offset_x="0.15"/>
+
     <gazebo>
         <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
-            <parameters>$(find robo_diferenciado)/config/ros2_control.yaml</parameters>
+            <parameters>$(find robo_diferenciado)/config/diff_drive_control.yaml</parameters>
         </plugin>
     </gazebo>
 

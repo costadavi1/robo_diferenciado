@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import os
-
+import yaml
 from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription
@@ -36,10 +36,38 @@ def generate_launch_description():
     pkg_ros_gz_sim = get_package_share_directory('ros_gz_sim')
 
     urdf_path = os.path.join(pkg_project_description, 'urdf', 'dif_base.urdf.xacro')
-    control_config_path = os.path.join(pkg_project_description, 'config', 'ros2_control.yaml')
+    control_config_path = os.path.join(pkg_project_description, 'config', 'diff_drive_control.yaml')
 
-    # Load the SDF file from "description" package
-    robot_description = Command(['xacro ', urdf_path])
+    # Load the SDF file from 'description' package
+
+    # Wheel radius and separation are taken from the controller config YAML
+    with open(control_config_path) as f:
+        params = yaml.safe_load(f)
+
+    controller_params = params['diff_drive_controller']['ros__parameters']
+
+    # Access YAML parameters:
+    wheel_radius = controller_params['wheel_radius']
+    wheel_separation = controller_params['wheel_separation']
+
+    print('Wheel radius from YAML:', wheel_radius)
+    print('Wheel separation from YAML:', wheel_separation)
+
+    robot_description = Command(['xacro ', urdf_path, ' ',
+                                'wheel_radius:=', str(wheel_radius), ' ',
+                                'wheel_separation:=', str(wheel_separation), ' ',
+                                'wheel_width:=0.05 ',
+                                'wheel_mass:=1.0 ',
+                                'caster_radius:=0.05 ',
+                                'caster_mass:=0.5 ',
+                                'caster_offset_x:=0.15 ',
+                                'chassis_mass:=5.0 ',
+                                'chassis_length:=0.4 ',
+                                'chassis_width:=0.3 ',
+                                'chassis_height:=0.1 '])
+
+
+    ############# Gazebo 2 ROS2 Launch
 
     # Setup to launch the simulator and Gazebo world
     gz_sim = IncludeLaunchDescription(
@@ -86,17 +114,10 @@ def generate_launch_description():
         arguments=['joint_state_broadcaster'],
     )
 
-    left_wheel_controller_spawner = Node(
+    diff_drive_controller_spawner = Node(
         package='controller_manager',
         executable='spawner',
-        arguments=['left_wheel_velocity_controller'],
-        parameters=[{'use_sim_time': True}]
-    )
-
-    right_wheel_controller_spawner = Node(
-        package='controller_manager',
-        executable='spawner',
-        arguments=['right_wheel_velocity_controller'],
+        arguments=['diff_drive_controller'],
         parameters=[{'use_sim_time': True}]
     )
 
@@ -121,7 +142,7 @@ def generate_launch_description():
 
     delay_joint_state_broadcaster_after_robot_controller_spawner = RegisterEventHandler(
         event_handler=OnProcessExit(
-            target_action=right_wheel_controller_spawner,
+            target_action=diff_drive_controller_spawner,
             on_exit=[joint_state_broadcaster_spawner],
         )
     )
@@ -134,8 +155,6 @@ def generate_launch_description():
                               description='Open RViz.'),
         rviz,
         # bridge,
-        left_wheel_controller_spawner,
-        right_wheel_controller_spawner,
-
+        diff_drive_controller_spawner,
         delay_joint_state_broadcaster_after_robot_controller_spawner,
     ])

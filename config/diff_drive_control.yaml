@@ -1,0 +1,31 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 50  # Hz
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    diff_drive_controller:
+      type: diff_drive_controller/DiffDriveController
+
+diff_drive_controller:
+  ros__parameters:
+    left_wheel_names: ["left_wheel_joint"]
+    right_wheel_names: ["right_wheel_joint"]
+
+    # Kinematics
+    wheel_radius: 0.1
+    wheel_separation: 0.175
+
+    # Control
+    publish_rate: 50.0
+    # command_interface: "velocity"
+    velocity_command_timeout: 0.25
+
+    use_stamped_vel: true
+
+    # Odometry
+    enable_odom_tf: true
+    base_frame_id: "base_link"
+    odom_frame_id: "odom"
+    publish_wheel_data: true
