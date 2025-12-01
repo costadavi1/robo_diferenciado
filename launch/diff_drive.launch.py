@@ -140,6 +140,17 @@ def generate_launch_description():
         output='screen'
     )
 
+    odom_node = Node(
+        package='robo_diferenciado',
+        executable='odom',
+        output='screen',
+        parameters=[
+            {'use_sim_time': True},
+            {'wheel_radius': wheel_radius},
+            {'wheel_separation': wheel_separation}
+        ]
+    )
+
     delay_joint_state_broadcaster_after_robot_controller_spawner = RegisterEventHandler(
         event_handler=OnProcessExit(
             target_action=diff_drive_controller_spawner,
@@ -155,6 +166,7 @@ def generate_launch_description():
                               description='Open RViz.'),
         rviz,
         # bridge,
+        odom_node,
         diff_drive_controller_spawner,
         delay_joint_state_broadcaster_after_robot_controller_spawner,
     ])
