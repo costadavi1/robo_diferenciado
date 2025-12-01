@@ -7,10 +7,20 @@ endif()
 
 find_package(ament_cmake REQUIRED)
 find_package(xacro REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(geometry_msgs REQUIRED)
+
+add_executable(drive_robot_stamped src/example_cmd_publisher.cpp)
+ament_target_dependencies(drive_robot_stamped rclcpp geometry_msgs)
 
 install(
-  DIRECTORY launch config worlds models
+  DIRECTORY src launch config worlds models urdf rviz
   DESTINATION share/${PROJECT_NAME}
+)
+
+install(TARGETS
+  drive_robot_stamped
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 if(BUILD_TESTING)
