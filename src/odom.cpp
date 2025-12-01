@@ -15,8 +15,11 @@ public:
   OdomNode()
       : Node("odom_node")
   {
-    wheel_radius_ = 0.05;
-    wheel_separation_ = 0.30;
+    this->declare_parameter("wheel_radius", 0.0);
+    wheel_radius_ = this->get_parameter("wheel_radius").as_double();
+    
+    this->declare_parameter("wheel_separation", 0.0);
+    wheel_separation_ = this->get_parameter("wheel_separation").as_double();
 
     last_time_ = this->now();
 
