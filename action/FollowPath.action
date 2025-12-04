@@ -1,0 +1,11 @@
+# GOAL
+nav_msgs/Path path
+---
+# RESULT
+bool success
+string message
+---
+# FEEDBACK
+float32 distance_to_goal
+float32 current_speed
+string status
