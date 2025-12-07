@@ -68,6 +68,12 @@
       </link>
     </model>
 
+    <model name="turtlebot3_world">
+      <static>1</static>
+      <include>
+        <uri>model://turtlebot3_world</uri>
+      </include>
+    </model>
     <!-- <model name="diff_drive">
       <self_collide>true</self_collide>
       <pose>0 0 0.35 0 0 0</pose>

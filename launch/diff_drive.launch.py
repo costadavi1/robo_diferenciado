@@ -158,6 +158,29 @@ def generate_launch_description():
         )
     )
 
+    map_file = os.path.join(pkg_project_description, 'map', 'map.yaml')
+
+    map_server_node = Node(
+        package="nav2_map_server",
+        executable="map_server",
+        name="map_server",
+        output="screen",
+        parameters=[{
+            "yaml_filename": map_file
+        }]
+    )
+    lifecycle_node = Node(
+        package="nav2_lifecycle_manager",
+        executable="lifecycle_manager",
+        name="lifecycle_manager_map",
+        output="screen",
+        parameters=[{
+            "use_sim_time": False,
+            "autostart": True,
+            "node_names": ["map_server"]
+        }]
+    )
+
     return LaunchDescription([
         gz_sim,
         gazebo_spawn_robot,
@@ -169,4 +192,6 @@ def generate_launch_description():
         odom_node,
         diff_drive_controller_spawner,
         delay_joint_state_broadcaster_after_robot_controller_spawner,
+        map_server_node,
+        lifecycle_node,
     ])
