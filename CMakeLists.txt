@@ -51,7 +51,6 @@ install(
   DESTINATION share/${PROJECT_NAME}
 )
 
-
 add_executable(astar_planner src/astar_planner.cpp)
 ament_target_dependencies(astar_planner rclcpp nav_msgs geometry_msgs)
 
@@ -60,6 +59,36 @@ install(TARGETS
   DESTINATION lib/${PROJECT_NAME})
 
   
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+find_package(SFML 2.5 COMPONENTS graphics window system REQUIRED)
+
+add_executable(map_viewer src/map_viewer.cpp)
+
+target_link_libraries(map_viewer
+    sfml-system
+    sfml-window
+    sfml-graphics
+)
+install(TARGETS
+  map_viewer
+  DESTINATION lib/${PROJECT_NAME})
+
+
+  add_executable(map_viewer_astar src/map_viewer_astar.cpp)
+
+target_link_libraries(map_viewer_astar
+    sfml-system
+    sfml-window
+    sfml-graphics
+)
+install(TARGETS
+  map_viewer_astar
+  DESTINATION lib/${PROJECT_NAME})
+
+  
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   set(ament_cmake_copyright_FOUND TRUE)
