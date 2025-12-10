@@ -7,18 +7,33 @@
 #include <vector>
 #include <cmath>
 #include <unordered_map>
+#include <iostream>
+#include <queue>
+#include <vector>
+#include <iostream>
+#include <chrono>
+#include <thread>
+#include <cmath>
+#include <sstream>
+#include <iomanip>
 
-struct AStarNode {
+using namespace std;
+
+struct AStarNode
+{
     int x, y;
     float f, g, h;
-    bool operator>(const AStarNode& other) const {
+    bool operator>(const AStarNode &other) const
+    {
         return f > other.f;
     }
 };
 
-class AStarPlanner : public rclcpp::Node {
+class AStarPlanner : public rclcpp::Node
+{
 public:
-    AStarPlanner() : Node("astar_planner") {
+    AStarPlanner() : Node("astar_planner")
+    {
         map_sub_ = this->create_subscription<nav_msgs::msg::OccupancyGrid>(
             "/map", 10, std::bind(&AStarPlanner::mapCallback, this, std::placeholders::_1));
 
@@ -32,10 +47,10 @@ public:
     }
 
 private:
-
     nav_msgs::msg::OccupancyGrid map_;
     bool map_received_ = false;
-
+    vector<vector<int>> grid_;
+    
     geometry_msgs::msg::PoseStamped start_, goal_;
     bool start_received_ = false, goal_received_ = false;
 
@@ -44,21 +59,24 @@ private:
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr goal_sub_;
     rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
 
-    void mapCallback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg) {
+    void mapCallback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg)
+    {
         map_ = *msg;
         map_received_ = true;
         RCLCPP_INFO_ONCE(this->get_logger(), "Map received");
         tryPlanning();
     }
 
-    void startCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
+    void startCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
+    {
         start_ = *msg;
         start_received_ = true;
         RCLCPP_INFO_ONCE(this->get_logger(), "start_ received");
         tryPlanning();
     }
 
-    void goalCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
+    void goalCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
+    {
         goal_ = *msg;
         goal_received_ = true;
         RCLCPP_INFO_ONCE(this->get_logger(), "goal_ received");
@@ -66,117 +84,125 @@ private:
         tryPlanning();
     }
 
-    void tryPlanning() {
-        if (map_received_ && start_received_ && goal_received_) {
+    void tryPlanning()
+    {
+        if (map_received_ && start_received_ && goal_received_)
+        {
+            int width = map_.info.width;
+            int height = map_.info.height;
+
+            std::vector<std::vector<int>> grid(height, std::vector<int>(width));
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    int index = y * width + x;
+                    grid_[y][x] = static_cast<int>(map_.data[index]);
+                }
+            }
+
             RCLCPP_INFO(this->get_logger(), "Running A*...");
             runAStar();
         }
     }
 
-    bool isFree(int x, int y) {
-        int idx = y * map_.info.width + x;
-        if (idx < 0 || idx >= (int)map_.data.size()) return false;
-        return map_.data[idx] == 0;
+    double heuristic_a(const std::pair<int, int> &goal, const std::pair<int, int> &current)
+    {
+        double h = std::sqrt((std::pow(goal.second - current.second, 2)) + (std::pow(goal.first - current.first, 2)));
+        std::cout << "h: " << h << std::endl;
+        return h;
     }
 
-    float heuristic(int x1, int y1, int x2, int y2) {
-        return std::hypot(x2 - x1, y2 - y1);
-    }
+    void runAStar()
+    {
+        priority_queue<
+            pair<double, pair<int, int>>,
+            vector<pair<double, pair<int, int>>>,
+            greater<pair<double, pair<int, int>>>>
+            frontier;
 
-    void runAStar() {
-        int w = map_.info.width;
-        int h = map_.info.height;
+        int rows = 30, cols = 30;
 
-        int sx = (start_.pose.position.x - map_.info.origin.position.x) / map_.info.resolution;
-        int sy = (start_.pose.position.y - map_.info.origin.position.y) / map_.info.resolution;
+        vector<vector<int>> grid(rows, vector<int>(cols, 0)); // 0 = livre, 1 = obstáculo
 
-        int gx = (goal_.pose.position.x - map_.info.origin.position.x) / map_.info.resolution;
-        int gy = (goal_.pose.position.y - map_.info.origin.position.y) / map_.info.resolution;
+        int sx = 0, sy = 0; // start
+        pair<int, int> start = {sx, sy};
+        pair<int, int> goal = {4, 15};
 
-        std::priority_queue<AStarNode, std::vector<AStarNode>, std::greater<AStarNode>> open;
+        frontier.push({0, start});
 
-        std::unordered_map<int, float> g_cost;
-        std::unordered_map<int, int> came_from;
+        vector<vector<pair<int, int>>> came_from(rows, vector<pair<int, int>>(cols, {-2, -2}));
+        vector<vector<double>> cost_so_far(rows, vector<double>(cols, {std::numeric_limits<double>::max()}));
+        came_from[sx][sy] = {-1, -1};
+        cost_so_far[sx][sy] = 0;
 
-        auto index = [&](int x, int y) { return y * w + x; };
+        int dx[8] = {1, -1, 0, 0, 1, -1, -1, 1};
+        int dy[8] = {0, 0, 1, -1, 1, -1, 1, -1};
 
-        AStarNode start_node {sx, sy, 0, 0, heuristic(sx, sy, gx, gy)};
-        start_node.f = start_node.h;
+        while (!frontier.empty())
+        {
+            auto [x, y] = frontier.top().second;
+            frontier.pop();
 
-        open.push(start_node); 
-        g_cost[index(sx, sy)] = 0.0f;
-
-        std::vector<std::pair<int,int>> neighbors = {
-            {1,0},{-1,0},{0,1},{0,-1}
-        };
-
-        bool found = false;
-
-        while (!open.empty()) {
-            AStarNode current = open.top();
-            open.pop();
-
-            if (current.x == gx && current.y == gy) {
-                found = true;
+            if (x == goal.first && y == goal.second)
+            {
                 break;
             }
 
-            for (auto& nb : neighbors) {
-                int nx = current.x + nb.first;
-                int ny = current.y + nb.second;
+            for (int i = 0; i < 8; i++)
+            {
+                int nx = x + dx[i];
+                int ny = y + dy[i];
 
-                if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
-                if (!isFree(nx, ny)) continue;
+                if (nx < 0 || nx >= rows || ny < 0 || ny >= cols)
+                {
+                    continue;
+                }
 
-                float new_g = g_cost[index(current.x, current.y)] + 1.0;
+                if (grid[nx][ny] == 1)
+                {
+                    continue;
+                }
 
-                if (!g_cost.count(index(nx, ny)) || new_g < g_cost[index(nx, ny)]) {
-                    g_cost[index(nx, ny)] = new_g;
-
-                    float h = heuristic(nx, ny, gx, gy);
-                    AStarNode next {nx, ny, new_g + h, new_g, h};
-                    open.push(next);
-
-                    came_from[index(nx, ny)] = index(current.x, current.y);
+                double new_cost = cost_so_far[x][y] + 1;
+                if (cost_so_far[nx][ny] == std::numeric_limits<double>::max() || new_cost < cost_so_far[nx][ny])
+                {
+                    cost_so_far[nx][ny] = new_cost;
+                    double priority = new_cost + AStarPlanner::heuristic_a(goal, pair<int, int>{nx, ny});
+                    frontier.push({priority, {nx, ny}});
+                    came_from[nx][ny] = {x, y};
                 }
             }
         }
 
-        if (!found) {
-            RCLCPP_WARN(this->get_logger(), "A* failed: no path.");
-            return;
+        vector<pair<int, int>> path;
+        pair<int, int> cur = goal;
+
+        if (came_from[cur.first][cur.second].first == -2)
+        {
+            cout << "Nenhum caminho encontrado!\n";
         }
+        else
+        {
+            while (!(cur.first == -1 && cur.second == -1))
+            {
+                path.push_back(cur);
+                cur = came_from[cur.first][cur.second];
+            }
+            reverse(path.begin(), path.end());
 
-        // Reconstruct path
-        nav_msgs::msg::Path path;
-        path.header.frame_id = map_.header.frame_id;
-        path.header.stamp = now();
-
-        int cx = gx, cy = gy;
-        while (!(cx == sx && cy == sy)) {
-            geometry_msgs::msg::PoseStamped pose;
-            pose.header = path.header;
-            pose.pose.position.x = cx * map_.info.resolution + map_.info.origin.position.x;
-            pose.pose.position.y = cy * map_.info.resolution + map_.info.origin.position.y;
-            path.poses.push_back(pose);
-
-            int idx = index(cx, cy);
-            auto it = came_from.find(idx);
-            if (it == came_from.end()) break;
-
-            int prev = it->second;
-            cx = prev % w;
-            cy = prev / w;
+            cout << "Path encontrado:\n";
+            for (auto &p : path)
+            {
+                cout << "(" << p.first << "," << p.second << ")\n";
+            }
         }
-
-        std::reverse(path.poses.begin(), path.poses.end());
-        path_pub_->publish(path);
-
-        RCLCPP_INFO(this->get_logger(), "A* path published.");
     }
 };
 
-int main(int argc, char * argv[]) {
+int main(int argc, char *argv[])
+{
     rclcpp::init(argc, argv);
     rclcpp::spin(std::make_shared<AStarPlanner>());
     rclcpp::shutdown();
