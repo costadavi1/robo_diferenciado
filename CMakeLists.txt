@@ -16,6 +16,7 @@ find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
+find_package(Eigen3 REQUIRED)
 
 
 add_executable(odom src/odom.cpp)
@@ -25,7 +26,7 @@ add_executable(drive_robot_stamped src/example_cmd_publisher.cpp)
 ament_target_dependencies(drive_robot_stamped rclcpp geometry_msgs)
 
 add_executable(trajectory_generator src/trajectory_generator.cpp)
-ament_target_dependencies(trajectory_generator rclcpp geometry_msgs nav_msgs rclcpp_action)
+ament_target_dependencies(trajectory_generator rclcpp geometry_msgs nav_msgs rclcpp_action Eigen3 tf2_geometry_msgs)
 
 add_executable(path_follower src/path_follower.cpp)
 ament_target_dependencies(path_follower rclcpp geometry_msgs nav_msgs rclcpp_action tf2_geometry_msgs)

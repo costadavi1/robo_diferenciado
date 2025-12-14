@@ -21,8 +21,10 @@ public:
       : Node("path_follower")
   {
     using namespace std::placeholders;
-    this->declare_parameter("lookahead_distance", 0.3);
+    this->declare_parameter("lookahead_distance", 0.2);
+    this->declare_parameter("speed_limit", 0.2);
     lookahead_distance_ = this->get_parameter("lookahead_distance").as_double();
+    speed_limit_ = this->get_parameter("speed_limit").as_double();
 
     // Create subscriber for robot pose (odometry)
     this->robot_pose_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
@@ -142,10 +144,15 @@ private:
           double k_linear = 0.5;  // Gain for linear velocity
           double k_angular = 1.0; // Gain for angular velocity
 
-          cmd_msg.twist.linear.x = k_linear * distance_to_intermediate;
+          double speed_signal = k_linear * distance_to_intermediate;
+          cmd_msg.twist.linear.x = speed_signal > speed_limit_ ? speed_limit_ : speed_signal;
 
           cmd_msg.twist.angular.z = k_angular * std::atan2(lookahead_y, lookahead_x);
           cmd_msg.header.stamp = this->now();
+
+          // For pure pursuit
+          // gamma = 2 dy(body_frame) / L^2
+          // cmd_msg.twist.angular.z = cmd_msg.twist.linear.x * (2.0 * lookahead_y) / (lookahead_distance_ * lookahead_distance_);
 
           // Publish command
           cmd_vel_pub_->publish(cmd_msg);
@@ -223,7 +230,8 @@ private:
 
   geometry_msgs::msg::Pose robot_pose_;
   double lookahead_distance_; // meters
-  double distance_threshold_ = 0.1; // meters
+  double distance_threshold_ = 0.05; // meters
+  double speed_limit_; // meters per second
 };
 
 int main(int argc, char **argv)

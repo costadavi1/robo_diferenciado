@@ -1,7 +1,11 @@
 # robo_diferenciado
 
 
+### Pure pursuit
+Follow the trajectory
+
 ## Install dependencies
+
 
 ### Gazebo Ignition Fortress
 ```
