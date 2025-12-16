@@ -29,7 +29,7 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
 
-    start_pos_x = 0.5
+    start_pos_x = -1.5
     start_pos_y = 0.5
 
     # Configure ROS nodes for launch

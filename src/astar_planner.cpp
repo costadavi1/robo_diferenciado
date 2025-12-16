@@ -365,7 +365,7 @@ private:
         {
             std::vector<int8_t> data = ConvertPGM(image, meta_data.negate, meta_data.occupied_thresh, meta_data.free_thresh);
             map_ = createOccupancyGrid(meta_data, data, image.width, image.height);
-            map_ = inflateOccupancyGrid(map_, 0.175, 0.0);
+            map_ = inflateOccupancyGrid(map_, robot_radius_, safety_margin_);
             return true;
         }
         else

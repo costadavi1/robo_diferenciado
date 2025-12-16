@@ -7,5 +7,5 @@ astar_planner:
     path_pub_topic_: ""
     goal_sub_topic_: ""
     odometry_sub_topic_: ""
-    robot_radius: 0.1
+    robot_radius: 0.2
     safety_margin: 0.1
