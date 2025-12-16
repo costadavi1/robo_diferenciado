@@ -54,11 +54,25 @@ install(
 add_executable(astar_planner src/astar_planner.cpp)
 ament_target_dependencies(astar_planner rclcpp nav_msgs geometry_msgs)
 
+target_link_libraries(astar_planner
+  yaml-cpp
+)
+
 install(TARGETS
   astar_planner
   DESTINATION lib/${PROJECT_NAME})
 
-  
+add_executable(Map src/Map.cpp)
+ament_target_dependencies(Map rclcpp nav_msgs geometry_msgs)
+
+target_link_libraries(Map
+  yaml-cpp
+)
+
+install(TARGETS
+  Map
+  DESTINATION lib/${PROJECT_NAME})
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 

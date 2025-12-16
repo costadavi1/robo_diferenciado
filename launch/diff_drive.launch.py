@@ -86,15 +86,27 @@ def generate_launch_description():
         executable='create',
         arguments=['-name', 'robo_diferenciado',
             '-topic', 'robot_description',
-            # '-x', str(pose_params['x']),
-            # '-y', str(pose_params['y']),
-            # '-z', str(pose_params['z']),
+            '-x', str(0.5),
+            '-y', str(0.5),
+            '-z', str(0),
             # '-R', str(pose_params['roll']),
             # '-P', str(pose_params['pitch']),
             # '-Y', str(pose_params['yaw']),
         ],
         output='screen'
     )
+    # Example static transform: map -> base_link
+    static_tf = Node(
+    package='tf2_ros',
+    executable='static_transform_publisher',
+    name='static_tf_map_to_base',
+    arguments=[
+    '0.5', '0.5', '0', # x y z
+    '0', '0', '0', # roll pitch yaw
+    'map', 'odom'
+    ]
+    )
+
 
     # Takes the description and joint angles as inputs and publishes the 3D poses of the robot links
     robot_state_publisher = Node(
@@ -175,11 +187,10 @@ def generate_launch_description():
         executable="lifecycle_manager",
         name="lifecycle_manager_map",
         output="screen",
-        parameters=[{
-            "use_sim_time": True,
-            "autostart": True,
-            "node_names": ["map_server"]
-        }]
+        parameters=[
+            {"use_sim_time": True},
+            {"autostart": True},
+            {"node_names": ["map_server"]}]
     )
 
     return LaunchDescription([
@@ -190,9 +201,10 @@ def generate_launch_description():
                               description='Open RViz.'),
         rviz,
         # bridge,
+        static_tf,
         odom_node,
         diff_drive_controller_spawner,
         delay_joint_state_broadcaster_after_robot_controller_spawner,
-        map_server_node,
-        lifecycle_node,
+        # map_server_node,
+        # lifecycle_node,
     ])
