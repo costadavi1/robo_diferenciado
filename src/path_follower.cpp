@@ -149,7 +149,7 @@ private:
           double speed_signal = k_linear * distance_to_intermediate;
           cmd_msg.twist.linear.x = speed_signal > speed_limit_ ? speed_limit_ : speed_signal;
 
-          // cmd_msg.twist.angular.z = k_angular * std::atan2(lookahead_y, lookahead_x);
+          cmd_msg.twist.angular.z = k_angular * std::atan2(lookahead_y, lookahead_x);
           // cmd_msg.twist.angular.z = cmd_msg.twist.linear.x * (2.0 * lookahead_y) / (lookahead_distance_ * lookahead_distance_);
           cmd_msg.header.stamp = this->now();
 
