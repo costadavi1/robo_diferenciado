@@ -3,6 +3,7 @@
 #include <nav_msgs/msg/path.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
+#include "robo_diferenciado/srv/generate_path.hpp"
 
 #include <string>
 #include <fstream>
@@ -23,6 +24,8 @@
 
 using namespace std;
 
+using std::placeholders::_1;
+using std::placeholders::_2;
 struct PGMImage
 {
     string magic_number;
@@ -226,9 +229,10 @@ class AStarPlanner : public rclcpp::Node
 public:
     AStarPlanner() : Node("astar_planner")
     {
-        rclcpp::Service<nav_msgs::msg::Path>::SharedPtr service =
-            this->create_service<nav_msgs::msg::Path>("create_path", &AStarPlanner::createPath);
-        
+        service_ = this->create_service<robo_diferenciado::srv::GeneratePath>(
+      "generate_path",
+      std::bind(&AStarPlanner::generate_path, this, _1, _2));
+
         odometry_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
             "/odom", 10, std::bind(&AStarPlanner::odomCallback, this, std::placeholders::_1));
 
@@ -247,6 +251,8 @@ private:
     bool map_received_ = false;
     vector<vector<int>> grid_;
 
+    nav_msgs::msg::Path path_out_;
+    
     bool start_received_ = false, goal_received_ = false;
     std::pair<int, int> goal_point_;
     std::pair<int, int> start_point_;
@@ -255,6 +261,8 @@ private:
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr goal_sub_;
     rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr map_pub_;
+
+    rclcpp::Service<robo_diferenciado::srv::GeneratePath>::SharedPtr service_;
 
     nav_msgs::msg::OccupancyGrid createOccupancyGrid(
         const MapMetaData &map,
@@ -322,8 +330,27 @@ private:
             return false;
         }
     }
-    void createPath()
+
+    void generate_path(
+        const std::shared_ptr<robo_diferenciado::srv::GeneratePath::Request> request,
+        std::shared_ptr<robo_diferenciado::srv::GeneratePath::Response> response)
     {
+        double wx = request->x;
+        double wy = request->y;
+        goal_point_ = {
+            static_cast<int>((wx - map_.info.origin.position.x) / map_.info.resolution),
+            static_cast<int>((wy - map_.info.origin.position.y) / map_.info.resolution)};
+        goal_received_ = true;
+        RCLCPP_INFO_ONCE(this->get_logger(), "goal_ received");
+
+        RCLCPP_INFO_ONCE(this->get_logger(), "world goal x: %f", wx);
+        RCLCPP_INFO_ONCE(this->get_logger(), "world goal y: %f", wy);
+
+        RCLCPP_INFO_ONCE(this->get_logger(), "index goal x: %i", goal_point_.first);
+        RCLCPP_INFO_ONCE(this->get_logger(), "index goal y: %i", goal_point_.second);
+
+        tryPlanning();  
+        response->path = path_out_;
     }
 
     void goalCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
@@ -451,10 +478,10 @@ private:
             reverse(path.begin(), path.end());
         }
 
-        nav_msgs::msg::Path path_out;
-
-        path_out.header.frame_id = "map";
-        path_out.header.stamp = this->get_clock()->now();
+       
+        path_out_.header.frame_id = "map";
+        path_out_.header.stamp = this->get_clock()->now();
+        path_out_.poses.clear();
 
         for (const auto &cell : path)
         {
@@ -462,7 +489,7 @@ private:
             int y = cell.second;
 
             geometry_msgs::msg::PoseStamped pose;
-            pose.header = path_out.header;
+            pose.header = path_out_.header;
 
             pose.pose.position.x =
                 map_.info.origin.position.x +
@@ -476,10 +503,10 @@ private:
 
             pose.pose.orientation.w = 1.0;
 
-            path_out.poses.push_back(pose);
+            path_out_.poses.push_back(pose);
         }
 
-        path_pub_->publish(path_out);
+        path_pub_->publish(path_out_);
 
         start_received_ = false;
         goal_received_ = false;

@@ -21,9 +21,17 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
+find_package(rosidl_default_runtime REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(SFML 2.5 COMPONENTS graphics window system REQUIRED)
 
+
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "srv/GeneratePath.srv"
+  "action/FollowPath.action"
+  DEPENDENCIES nav_msgs geometry_msgs
+)
+ament_export_dependencies(rosidl_default_runtime)
 
 add_executable(odom src/odom.cpp)
 ament_target_dependencies(odom rclcpp sensor_msgs nav_msgs geometry_msgs tf2 tf2_ros tf2_geometry_msgs)
@@ -49,12 +57,7 @@ target_link_libraries(map_reader
   yaml-cpp
 )
 
-add_executable(Map src/Map.cpp)
-ament_target_dependencies(Map rclcpp nav_msgs geometry_msgs)
 
-target_link_libraries(Map
-  yaml-cpp
-)
 
 add_executable(map_viewer src/map_viewer.cpp)
 target_link_libraries(map_viewer
@@ -70,18 +73,19 @@ target_link_libraries(map_viewer_astar
     sfml-graphics
 )
 
+rosidl_get_typesupport_target(cpp_typesupport_target
+  ${PROJECT_NAME} rosidl_typesupport_cpp)
 
-# Interface generation
-rosidl_generate_interfaces(${PROJECT_NAME}
-  "action/FollowPath.action"
-  DEPENDENCIES nav_msgs
-)
+target_link_libraries(astar_planner
+  ${cpp_typesupport_target})
 
-rosidl_target_interfaces(trajectory_generator
-  ${PROJECT_NAME} "rosidl_typesupport_cpp")
+target_link_libraries(trajectory_generator
+  ${cpp_typesupport_target})
 
-rosidl_target_interfaces(path_follower
-  ${PROJECT_NAME} "rosidl_typesupport_cpp")
+target_link_libraries(path_follower
+  ${cpp_typesupport_target})
+
+
 
 # Install directories
 install(
@@ -98,7 +102,6 @@ install(TARGETS
   map_reader
   map_viewer
   map_viewer_astar
-  Map
   DESTINATION lib/${PROJECT_NAME}
 )
 
