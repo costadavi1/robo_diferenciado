@@ -24,6 +24,13 @@
         <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
             <parameters>$(find robo_diferenciado)/config/diff_drive_control.yaml</parameters>
         </plugin>
+        <plugin
+            filename="libignition-gazebo-odometry-publisher-system.so"
+            name="ignition::gazebo::systems::OdometryPublisher">
+            <odom_frame>ground_truth</odom_frame>
+            <robot_base_frame>base_link</robot_base_frame>
+            <dimensions>2</dimensions>
+        </plugin>
     </gazebo>
 
 </robot>

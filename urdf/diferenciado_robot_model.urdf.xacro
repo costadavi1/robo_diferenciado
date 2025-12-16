@@ -138,23 +138,35 @@
         <xacro:sphere_inertia m="${caster_mass}" r="${caster_radius}"/>
     </link>
 
-    <joint name="caster_joint" type="fixed">
+    <joint name="caster_joint" type="continuous">
         <parent link="chassis"/>
         <child link="caster_wheel"/>
         <origin xyz="${caster_offset_x} 0 -${wheel_radius - caster_radius}" rpy="0 0 0"/>
     </joint>
 
     <gazebo reference="left_wheel">
-        <mu1>1.0</mu1> <mu2>1.0</mu2>
+        <mu1>2000.0</mu1>
+        <mu2>0.5</mu2>
+        <kp>10000000.0</kp>
+        <kd>1.0</kd>
+        <fdir1>1 0 0</fdir1>
         <material>Gazebo/Black</material>
     </gazebo>
+
     <gazebo reference="right_wheel">
-        <mu1>1.0</mu1> <mu2>1.0</mu2>
+        <mu1>2000.0</mu1>
+        <mu2>0.5</mu2>
+        <kp>10000000.0</kp>
+        <kd>1.0</kd>
+        <fdir1>1 0 0</fdir1>
         <material>Gazebo/Black</material>
     </gazebo>
 
     <gazebo reference="caster_wheel">
-        <mu1>0.001</mu1> <mu2>0.001</mu2>
+        <mu1>0.001</mu1>
+        <mu2>0.001</mu2>
+        <kp>1000000.0</kp>
+        <kd>1.0</kd>
         <material>Gazebo/White</material>
     </gazebo>
     </xacro:macro>
