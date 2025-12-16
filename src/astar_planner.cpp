@@ -174,9 +174,6 @@ class AStarPlanner : public rclcpp::Node
 public:
     AStarPlanner() : Node("astar_planner")
     {
-        // map_sub_ = this->create_subscription<nav_msgs::msg::OccupancyGrid>(
-        //     "/map", 10, std::bind(&AStarPlanner::mapCallback, this, std::placeholders::_1));
-
         start_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
             "/start", 10, std::bind(&AStarPlanner::startCallback, this, std::placeholders::_1));
 
@@ -202,7 +199,7 @@ private:
     bool start_received_ = false, goal_received_ = false;
     std::pair<int, int> goal_point_;
     std::pair<int, int> start_point_;
-    // rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr map_sub_;
+
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr start_sub_;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odometry_sub_;
 
@@ -210,14 +207,6 @@ private:
     rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
 
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr map_pub_;
-
-    // void mapCallback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg)
-    // {
-    //     map_ = *msg;
-    //     map_received_ = true;
-    //     RCLCPP_INFO_ONCE(this->get_logger(), "Map received");
-    //     tryPlanning();
-    // }
 
     nav_msgs::msg::OccupancyGrid createOccupancyGrid(
     const MapMetaData &map,
@@ -259,12 +248,6 @@ private:
             static_cast<int>((wx - map_.info.origin.position.x) / map_.info.resolution),
             static_cast<int>((wy - map_.info.origin.position.y) / map_.info.resolution)};
 
-        RCLCPP_INFO_ONCE(this->get_logger(), "world start x: %f", wx);
-        RCLCPP_INFO_ONCE(this->get_logger(), "world start y: %f", wy);
-        RCLCPP_INFO_ONCE(this->get_logger(), "index start x: %i", start_point_.first);
-        RCLCPP_INFO_ONCE(this->get_logger(), "index start y: %i", start_point_.second);
-        RCLCPP_INFO_ONCE(this->get_logger(), "odom received!");
-
         start_received_ = true;
         map_pub_->publish(map_);
 
@@ -280,12 +263,7 @@ private:
         PGMImage image;
         if (readPGM(pgm_path, image))
         {
-            cout << "Successfully read PGM image:" << endl;
-            cout << "Width: " << image.width << ", Height: " << image.height << endl;
-            cout << "Max Value: " << image.max_val << endl;
-
             std::vector<int8_t> data = ConvertPGM(image, meta_data.negate, meta_data.occupied_thresh, meta_data.free_thresh);
-            // std::cout << data << std::endl;
             map_ = createOccupancyGrid(meta_data, data, image.width, image.height);
 
             return true;
@@ -331,19 +309,12 @@ private:
     {
         if (map_received_ && start_received_ && goal_received_)
         {
-            std::cout << "tryPlanning 1 " << std::endl;
-
             int width = map_.info.width;
             int height = map_.info.height;
-
-            std::cout << "map_.info.width " << map_.info.width << std::endl;
-            std::cout << "map_.info.height " << map_.info.height << std::endl;
-            std::cout << "map_.data.size() " << map_.data.size() << std::endl;
 
             std::vector<std::vector<int>> grid(height, std::vector<int>(width));
 
             grid_ = grid;
-            std::cout << "tryPlanning 2 " << std::endl;
 
             for (int y = 0; y < height; y++)
             {
@@ -353,8 +324,6 @@ private:
                     grid_[y][x] = static_cast<int>(map_.data[index]);
                 }
             }
-            std::cout << "tryPlanning 3 " << std::endl;
-
             RCLCPP_INFO(this->get_logger(), "Running A*...");
             runAStar();
         }
@@ -377,23 +346,16 @@ private:
             greater<pair<double, pair<int, int>>>>
             frontier;
 
-        // int rows = 30, cols = 30;
-
-        // vector<vector<int>> grid(rows, vector<int>(cols, 0)); // 0 = livre, 1 = obstáculo
-
-        // int sx = 0, sy = 0; // start
         pair<int, int> start = start_point_;
         pair<int, int> goal = goal_point_;
 
         frontier.push({0, start});
 
         vector<vector<pair<int, int>>> came_from(map_.info.height, vector<pair<int, int>>(map_.info.width, {-2, -2}));
-        // vector<vector<double>> cost_so_far(map_.info.height, vector<double>(map_.info.width, {std::numeric_limits<double>::max()}));
         vector<vector<double>> cost_so_far(map_.info.height, vector<double>(map_.info.width, std::numeric_limits<double>::max()));
         came_from[start_point_.first][start_point_.second] = {-1, -1};
         cost_so_far[start_point_.first][start_point_.second] = 0;
 
-        std::cout << "Aqui2 " << std::endl;
 
         int dx[8] = {1, -1, 0, 0, 1, -1, -1, 1};
         int dy[8] = {0, 0, 1, -1, 1, -1, 1, -1};
@@ -402,10 +364,6 @@ private:
         {
             auto [x, y] = frontier.top().second;
             frontier.pop();
-            std::cout << "Aqui3 " << std::endl;
-
-            std::cout << "x: " << x << std::endl;
-            std::cout << "y: " << y << std::endl;
 
             if (x == goal.first && y == goal.second)
             {
@@ -415,22 +373,16 @@ private:
 
             for (int i = 0; i < 8; i++)
             {
-                std::cout << "Aqui4 " << std::endl;
-
                 int nx = x + dx[i];
                 int ny = y + dy[i];
 
                 if (nx < 0 || nx >= map_.info.height || ny < 0 || ny >= map_.info.width)
                 {
-                    std::cout << "fora da grid!!! " << std::endl;
-
                     continue;
                 }
 
                 if (grid_[ny][nx] > 65)
                 {
-                    std::cout << "obstaculo!!! " << std::endl;
-
                     continue;
                 }
 
