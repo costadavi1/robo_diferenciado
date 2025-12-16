@@ -28,7 +28,7 @@ public:
 
     // Create subscriber for robot pose (odometry)
     this->robot_pose_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
-        "/diff_drive_controller/odom", 10,
+        "/odom", 10,
         std::bind(&PathFollower::robot_pose_callback, this, _1));
     // Create publisher for cmd_vel
     this->cmd_vel_pub_ = this->create_publisher<geometry_msgs::msg::TwistStamped>("/diff_drive_controller/cmd_vel", 10);
@@ -147,12 +147,9 @@ private:
           double speed_signal = k_linear * distance_to_intermediate;
           cmd_msg.twist.linear.x = speed_signal > speed_limit_ ? speed_limit_ : speed_signal;
 
-          cmd_msg.twist.angular.z = k_angular * std::atan2(lookahead_y, lookahead_x);
+          // cmd_msg.twist.angular.z = k_angular * std::atan2(lookahead_y, lookahead_x);
+          cmd_msg.twist.angular.z = cmd_msg.twist.linear.x * (2.0 * lookahead_y) / (lookahead_distance_ * lookahead_distance_);
           cmd_msg.header.stamp = this->now();
-
-          // For pure pursuit
-          // gamma = 2 dy(body_frame) / L^2
-          // cmd_msg.twist.angular.z = cmd_msg.twist.linear.x * (2.0 * lookahead_y) / (lookahead_distance_ * lookahead_distance_);
 
           // Publish command
           cmd_vel_pub_->publish(cmd_msg);
