@@ -39,10 +39,20 @@ ament_target_dependencies(path_follower rclcpp geometry_msgs nav_msgs rclcpp_act
 
 add_executable(astar_planner src/astar_planner.cpp)
 ament_target_dependencies(astar_planner rclcpp nav_msgs geometry_msgs)
+target_link_libraries(astar_planner
+  yaml-cpp
+)
 
 add_executable(map_reader src/map_reader.cpp)
 ament_target_dependencies(map_reader ament_cmake rclcpp nav_msgs)
 target_link_libraries(map_reader
+  yaml-cpp
+)
+
+add_executable(Map src/Map.cpp)
+ament_target_dependencies(Map rclcpp nav_msgs geometry_msgs)
+
+target_link_libraries(Map
   yaml-cpp
 )
 
@@ -88,6 +98,7 @@ install(TARGETS
   map_reader
   map_viewer
   map_viewer_astar
+  Map
   DESTINATION lib/${PROJECT_NAME}
 )
 
