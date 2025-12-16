@@ -15,6 +15,8 @@ find_package(nav_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+find_package(yaml-cpp REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(Eigen3 REQUIRED)
 
@@ -31,6 +33,16 @@ ament_target_dependencies(trajectory_generator rclcpp geometry_msgs nav_msgs rcl
 add_executable(path_follower src/path_follower.cpp)
 ament_target_dependencies(path_follower rclcpp geometry_msgs nav_msgs rclcpp_action tf2_geometry_msgs)
 
+add_executable(astar_planner src/astar_planner.cpp)
+ament_target_dependencies(astar_planner rclcpp nav_msgs geometry_msgs)
+
+add_executable(map_reader src/map_reader.cpp)
+ament_target_dependencies(map_reader ament_cmake rclcpp nav_msgs)
+
+target_link_libraries(map_reader
+  yaml-cpp
+)
+
 # Interface generation
 rosidl_generate_interfaces(${PROJECT_NAME}
   "action/FollowPath.action"
@@ -43,9 +55,9 @@ rosidl_target_interfaces(trajectory_generator
 rosidl_target_interfaces(path_follower
   ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
-# Install files
+# Install directories
 install(
-  DIRECTORY action src launch config worlds models urdf rviz
+  DIRECTORY action src launch config worlds models urdf rviz map
   DESTINATION share/${PROJECT_NAME}
 )
 
@@ -54,8 +66,11 @@ install(TARGETS
   drive_robot_stamped
   trajectory_generator
   path_follower
+  astar_planner
+  map_reader
   DESTINATION lib/${PROJECT_NAME}
 )
+
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
