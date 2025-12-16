@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.8)
 project(robo_diferenciado)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
@@ -19,6 +22,7 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(SFML 2.5 COMPONENTS graphics window system REQUIRED)
 
 
 add_executable(odom src/odom.cpp)
@@ -38,10 +42,24 @@ ament_target_dependencies(astar_planner rclcpp nav_msgs geometry_msgs)
 
 add_executable(map_reader src/map_reader.cpp)
 ament_target_dependencies(map_reader ament_cmake rclcpp nav_msgs)
-
 target_link_libraries(map_reader
   yaml-cpp
 )
+
+add_executable(map_viewer src/map_viewer.cpp)
+target_link_libraries(map_viewer
+    sfml-system
+    sfml-window
+    sfml-graphics
+)
+
+add_executable(map_viewer_astar src/map_viewer_astar.cpp)
+target_link_libraries(map_viewer_astar
+    sfml-system
+    sfml-window
+    sfml-graphics
+)
+
 
 # Interface generation
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -68,6 +86,8 @@ install(TARGETS
   path_follower
   astar_planner
   map_reader
+  map_viewer
+  map_viewer_astar
   DESTINATION lib/${PROJECT_NAME}
 )
 
