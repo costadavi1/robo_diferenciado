@@ -264,6 +264,8 @@ private:
     double safety_margin_;
     std::string map_path_;
     nav_msgs::msg::Path path_out_;
+    double start_pos_x_;
+    double start_pos_y_;
 
     bool start_received_ = false, goal_received_ = false;
     std::pair<int, int> goal_point_;
@@ -278,6 +280,12 @@ private:
 
     void init_parameters()
     {
+        this->declare_parameter("start_pos_x", 0.0);
+        start_pos_x_ = this->get_parameter("start_pos_x").as_double();
+
+        this->declare_parameter("start_pos_y", 0.0);
+        start_pos_y_ = this->get_parameter("start_pos_y").as_double();
+
         this->declare_parameter("robot_radius", 0.0);
         robot_radius_ = this->get_parameter("robot_radius").as_double();
 
@@ -287,6 +295,8 @@ private:
         this->declare_parameter("map_path", "");
         map_path_ = this->get_parameter("map_path").as_string();
 
+        std::cout << "start_pos_x_" << start_pos_x_ << std::endl;
+        std::cout << "start_pos_y_" << start_pos_y_ << std::endl;
         std::cout << "robot_radius_" << robot_radius_ << std::endl;
         std::cout << "safety_margin_" << safety_margin_ << std::endl;
         std::cout << "map_path_" << map_path_ << std::endl;
@@ -324,8 +334,8 @@ private:
 
     void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
     {
-        double wx = msg->pose.pose.position.x + 0.5;
-        double wy = msg->pose.pose.position.y + 0.5;
+        double wx = msg->pose.pose.position.x + start_pos_x_;
+        double wy = msg->pose.pose.position.y + start_pos_y_;
 
         start_point_ = {
             static_cast<int>((wx - map_.info.origin.position.x) / map_.info.resolution),
@@ -491,7 +501,7 @@ private:
             reverse(path.begin(), path.end());
         }
 
-        path_out_.header.frame_id = "map";
+        path_out_.header.frame_id = "odom";
         path_out_.header.stamp = this->get_clock()->now();
         path_out_.poses.clear();
 
@@ -505,11 +515,14 @@ private:
 
             pose.pose.position.x =
                 map_.info.origin.position.x +
-                (x + 0.5) * map_.info.resolution;
+                (x)*map_.info.resolution;
 
             pose.pose.position.y =
                 map_.info.origin.position.y +
-                (y + 0.5) * map_.info.resolution;
+                (y)*map_.info.resolution;
+
+            pose.pose.position.x -= start_pos_x_;
+            pose.pose.position.y -= start_pos_y_;
 
             pose.pose.position.z = 0.0;
 

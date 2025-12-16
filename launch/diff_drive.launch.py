@@ -28,6 +28,10 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
+
+    start_pos_x = 0.5
+    start_pos_y = 0.5
+
     # Configure ROS nodes for launch
 
     # Setup project paths
@@ -86,8 +90,8 @@ def generate_launch_description():
         executable='create',
         arguments=['-name', 'robo_diferenciado',
             '-topic', 'robot_description',
-            '-x', str(0.5),
-            '-y', str(0.5),
+            '-x', str(start_pos_x),
+            '-y', str(start_pos_y),
             '-z', str(0),
             # '-R', str(pose_params['roll']),
             # '-P', str(pose_params['pitch']),
@@ -101,7 +105,7 @@ def generate_launch_description():
     executable='static_transform_publisher',
     name='static_tf_map_to_base',
     arguments=[
-    '0.5', '0.5', '0', # x y z
+    str(start_pos_x), str(start_pos_y), '0', # x y z
     '0', '0', '0', # roll pitch yaw
     'map', 'odom'
     ]
@@ -174,6 +178,8 @@ def generate_launch_description():
         parameters=[
             {'use_sim_time': True},
             {'map_path': map_path},
+            {'start_pos_x': start_pos_x},
+            {'start_pos_y': start_pos_y},
             astar_config
         ]
     )
@@ -183,28 +189,6 @@ def generate_launch_description():
             target_action=diff_drive_controller_spawner,
             on_exit=[joint_state_broadcaster_spawner],
         )
-    )
-
-    map_file = os.path.join(pkg_project_description, 'map', 'map.yaml')
-
-    map_server_node = Node(
-        package="nav2_map_server",
-        executable="map_server",
-        name="map_server",
-        output="screen",
-        parameters=[{
-            "yaml_filename": map_file
-        }]
-    )
-    lifecycle_node = Node(
-        package="nav2_lifecycle_manager",
-        executable="lifecycle_manager",
-        name="lifecycle_manager_map",
-        output="screen",
-        parameters=[
-            {"use_sim_time": True},
-            {"autostart": True},
-            {"node_names": ["map_server"]}]
     )
 
     return LaunchDescription([
@@ -220,6 +204,4 @@ def generate_launch_description():
         diff_drive_controller_spawner,
         delay_joint_state_broadcaster_after_robot_controller_spawner,
         astar_node,
-        # map_server_node,
-        # lifecycle_node,
     ])
