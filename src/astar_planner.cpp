@@ -142,8 +142,6 @@ std::vector<int8_t> ConvertPGM(
     return data;
 }
 
-
-
 MapMetaData loadYaml(const std::string &yaml_file)
 {
     YAML::Node doc = YAML::LoadFile(yaml_file);
@@ -169,14 +167,68 @@ struct AStarNode
     }
 };
 
+nav_msgs::msg::OccupancyGrid inflateOccupancyGrid(
+    const nav_msgs::msg::OccupancyGrid &input,
+    double robot_radius,
+    double safety_margin)
+{
+    nav_msgs::msg::OccupancyGrid output = input;
+
+    const int width = input.info.width;
+    const int height = input.info.height;
+    const double res = input.info.resolution;
+
+    const int R = static_cast<int>(
+        std::ceil((robot_radius + safety_margin) / res));
+
+    const auto &in = input.data;
+    auto &out = output.data;
+
+    // Começa com tudo livre
+    out.assign(in.begin(), in.end());
+
+    for (int y = 0; y < height; ++y)
+    {
+        for (int x = 0; x < width; ++x)
+        {
+            int idx = y * width + x;
+
+            // Trata obstáculo e desconhecido como obstáculo
+            if (in[idx] == 100 || in[idx] == -1)
+            {
+                for (int dy = -R; dy <= R; ++dy)
+                {
+                    for (int dx = -R; dx <= R; ++dx)
+                    {
+                        if (dx * dx + dy * dy > R * R)
+                            continue;
+
+                        int nx = x + dx;
+                        int ny = y + dy;
+
+                        if (nx >= 0 && nx < width &&
+                            ny >= 0 && ny < height)
+                        {
+                            int nidx = ny * width + nx;
+                            out[nidx] = 100;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return output;
+}
+
 class AStarPlanner : public rclcpp::Node
 {
 public:
     AStarPlanner() : Node("astar_planner")
     {
-        start_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
-            "/start", 10, std::bind(&AStarPlanner::startCallback, this, std::placeholders::_1));
-
+        rclcpp::Service<nav_msgs::msg::Path>::SharedPtr service =
+            this->create_service<nav_msgs::msg::Path>("create_path", &AStarPlanner::createPath);
+        
         odometry_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
             "/odom", 10, std::bind(&AStarPlanner::odomCallback, this, std::placeholders::_1));
 
@@ -195,49 +247,45 @@ private:
     bool map_received_ = false;
     vector<vector<int>> grid_;
 
-    geometry_msgs::msg::PoseStamped start_, goal_;
     bool start_received_ = false, goal_received_ = false;
     std::pair<int, int> goal_point_;
     std::pair<int, int> start_point_;
 
-    rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr start_sub_;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odometry_sub_;
-
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr goal_sub_;
     rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
-
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr map_pub_;
 
     nav_msgs::msg::OccupancyGrid createOccupancyGrid(
-    const MapMetaData &map,
-    const std::vector<int8_t> &data,
-    int width,
-    int height)
-{
-    nav_msgs::msg::OccupancyGrid grid;
-
-    if (!data.empty())
+        const MapMetaData &map,
+        const std::vector<int8_t> &data,
+        int width,
+        int height)
     {
-        grid.header.stamp = this->get_clock()->now();
-        grid.header.frame_id= "map";
-        grid.info.resolution = map.resolution;
-        grid.info.width = width;
-        grid.info.height = height;
+        nav_msgs::msg::OccupancyGrid grid;
 
-        grid.info.origin.position.x = map.origin[0];
-        grid.info.origin.position.y = map.origin[1];
-        grid.info.origin.position.z = 0.0;
-        grid.info.origin.orientation.w = 1.0;
+        if (!data.empty())
+        {
+            grid.header.stamp = this->get_clock()->now();
+            grid.header.frame_id = "map";
+            grid.info.resolution = map.resolution;
+            grid.info.width = width;
+            grid.info.height = height;
 
-        grid.data = data;
+            grid.info.origin.position.x = map.origin[0];
+            grid.info.origin.position.y = map.origin[1];
+            grid.info.origin.position.z = 0.0;
+            grid.info.origin.orientation.w = 1.0;
+
+            grid.data = data;
+        }
+        else
+        {
+            std::cout << "empty" << endl;
+        }
+
+        return grid;
     }
-    else
-    {
-        std::cout << "empty" << endl;
-    }
-
-    return grid;
-}
 
     void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
     {
@@ -265,7 +313,7 @@ private:
         {
             std::vector<int8_t> data = ConvertPGM(image, meta_data.negate, meta_data.occupied_thresh, meta_data.free_thresh);
             map_ = createOccupancyGrid(meta_data, data, image.width, image.height);
-
+            map_ = inflateOccupancyGrid(map_, 0.175, 0.0);
             return true;
         }
         else
@@ -274,20 +322,12 @@ private:
             return false;
         }
     }
-
-    void startCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
+    void createPath()
     {
-        start_ = *msg;
-        RCLCPP_INFO_ONCE(this->get_logger(), "start_ received");
-
-        tryPlanning();
     }
 
     void goalCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
     {
-        // goal_ = *msg;
-        // goal_point_ = {msg->pose.position.x, msg->pose.position.y};
-
         double wx = msg->pose.position.x;
         double wy = msg->pose.position.y;
         goal_point_ = {
@@ -338,8 +378,6 @@ private:
 
     void runAStar()
     {
-        std::cout << "Aqui1 " << std::endl;
-
         priority_queue<
             pair<double, pair<int, int>>,
             vector<pair<double, pair<int, int>>>,
@@ -355,7 +393,6 @@ private:
         vector<vector<double>> cost_so_far(map_.info.height, vector<double>(map_.info.width, std::numeric_limits<double>::max()));
         came_from[start_point_.first][start_point_.second] = {-1, -1};
         cost_so_far[start_point_.first][start_point_.second] = 0;
-
 
         int dx[8] = {1, -1, 0, 0, 1, -1, -1, 1};
         int dy[8] = {0, 0, 1, -1, 1, -1, 1, -1};
@@ -412,12 +449,6 @@ private:
                 cur = came_from[cur.first][cur.second];
             }
             reverse(path.begin(), path.end());
-
-            cout << "Path encontrado:\n";
-            for (auto &p : path)
-            {
-                cout << "(" << p.first << "," << p.second << ")\n";
-            }
         }
 
         nav_msgs::msg::Path path_out;
