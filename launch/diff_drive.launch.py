@@ -55,7 +55,7 @@ def generate_launch_description():
 
     robot_description = Command(['xacro ', urdf_path, ' ',
                                 'wheel_radius:=', str(wheel_radius), ' ',
-                                'wheel_separation:=', str(wheel_separation), ' ',
+                                'wheel_separation:=', str(wheel_separation/2), ' ',
                                 'wheel_width:=0.05 ',
                                 'wheel_mass:=1.0 ',
                                 'caster_radius:=0.05 ',
@@ -87,7 +87,7 @@ def generate_launch_description():
             '-topic', 'robot_description',
             # '-x', str(pose_params['x']),
             # '-y', str(pose_params['y']),
-            # '-z', str(pose_params['z']),
+            # '-z', str(0.1),
             # '-R', str(pose_params['roll']),
             # '-P', str(pose_params['pitch']),
             # '-Y', str(pose_params['yaw']),
@@ -134,7 +134,7 @@ def generate_launch_description():
         package='ros_gz_bridge',
         executable='parameter_bridge',
         parameters=[{
-            'config_file': os.path.join(pkg_project_bringup, 'config', 'ros_gz_example_bridge.yaml'),
+            'config_file': os.path.join(pkg_project_bringup, 'config', 'gz_bridge.yaml'),
             'qos_overrides./tf_static.publisher.durability': 'transient_local',
         }],
         output='screen'
@@ -165,7 +165,7 @@ def generate_launch_description():
         DeclareLaunchArgument('rviz', default_value='true',
                               description='Open RViz.'),
         rviz,
-        # bridge,
+        bridge,
         odom_node,
         diff_drive_controller_spawner,
         delay_joint_state_broadcaster_after_robot_controller_spawner,

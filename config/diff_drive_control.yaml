@@ -15,7 +15,7 @@ diff_drive_controller:
 
     # Kinematics
     wheel_radius: 0.1
-    wheel_separation: 0.175
+    wheel_separation: 0.35
 
     # Control
     publish_rate: 50.0
