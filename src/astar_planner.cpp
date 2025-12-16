@@ -160,6 +160,13 @@ MapMetaData loadYaml(const std::string &yaml_file)
     return map;
 }
 
+double euclidian_distance(const std::pair<int, int> &goal, const std::pair<int, int> &current)
+{
+    double h = std::sqrt((std::pow(goal.second - current.second, 2)) + (std::pow(goal.first - current.first, 2)));
+    // std::cout << "h: " << h << std::endl;
+    return h;
+}
+
 struct AStarNode
 {
     int x, y;
@@ -229,9 +236,11 @@ class AStarPlanner : public rclcpp::Node
 public:
     AStarPlanner() : Node("astar_planner")
     {
+
+        init_parameters();
         service_ = this->create_service<robo_diferenciado::srv::GeneratePath>(
-      "generate_path",
-      std::bind(&AStarPlanner::generate_path, this, _1, _2));
+            "generate_path",
+            std::bind(&AStarPlanner::generate_path, this, _1, _2));
 
         odometry_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
             "/odom", 10, std::bind(&AStarPlanner::odomCallback, this, std::placeholders::_1));
@@ -243,16 +252,19 @@ public:
 
         map_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/map", 10);
 
-        map_received_ = importMap("/home/davi/project_ws/src/robo_diferenciado/map/map.yaml", "/home/davi/project_ws/src/robo_diferenciado/map/map.pgm");
+        // map_received_ = importMap("/home/davi/project_ws/src/robo_diferenciado/map/map.yaml", "/home/davi/project_ws/src/robo_diferenciado/map/map.pgm");
+        map_received_ = importMap();
     }
 
 private:
     nav_msgs::msg::OccupancyGrid map_;
     bool map_received_ = false;
     vector<vector<int>> grid_;
-
+    double robot_radius_;
+    double safety_margin_;
+    std::string map_path_;
     nav_msgs::msg::Path path_out_;
-    
+
     bool start_received_ = false, goal_received_ = false;
     std::pair<int, int> goal_point_;
     std::pair<int, int> start_point_;
@@ -264,6 +276,21 @@ private:
 
     rclcpp::Service<robo_diferenciado::srv::GeneratePath>::SharedPtr service_;
 
+    void init_parameters()
+    {
+        this->declare_parameter("robot_radius", 0.0);
+        robot_radius_ = this->get_parameter("robot_radius").as_double();
+
+        this->declare_parameter("safety_margin", 0.0);
+        safety_margin_ = this->get_parameter("safety_margin").as_double();
+
+        this->declare_parameter("map_path", "");
+        map_path_ = this->get_parameter("map_path").as_string();
+
+        std::cout << "robot_radius_" << robot_radius_ << std::endl;
+        std::cout << "safety_margin_" << safety_margin_ << std::endl;
+        std::cout << "map_path_" << map_path_ << std::endl;
+    }
     nav_msgs::msg::OccupancyGrid createOccupancyGrid(
         const MapMetaData &map,
         const std::vector<int8_t> &data,
@@ -310,14 +337,21 @@ private:
         tryPlanning();
     }
 
-    bool importMap(const std::string &yaml_path, const std::string &pgm_path)
+    bool importMap()
+    // bool importMap(const std::string &yaml_path, const std::string &pgm_path)
     {
         MapMetaData meta_data;
-        meta_data = loadYaml(yaml_path);
-        cout << meta_data.occupied_thresh << endl;
+        try
+        {
+            meta_data = loadYaml(map_path_ + "/map.yaml");
+        }
+        catch (const std::exception &e)
+        {
+            std::cerr << "Erro: " << e.what() << std::endl;
+        }
 
         PGMImage image;
-        if (readPGM(pgm_path, image))
+        if (readPGM(map_path_ + "/map.pgm", image))
         {
             std::vector<int8_t> data = ConvertPGM(image, meta_data.negate, meta_data.occupied_thresh, meta_data.free_thresh);
             map_ = createOccupancyGrid(meta_data, data, image.width, image.height);
@@ -341,15 +375,8 @@ private:
             static_cast<int>((wx - map_.info.origin.position.x) / map_.info.resolution),
             static_cast<int>((wy - map_.info.origin.position.y) / map_.info.resolution)};
         goal_received_ = true;
-        RCLCPP_INFO_ONCE(this->get_logger(), "goal_ received");
 
-        RCLCPP_INFO_ONCE(this->get_logger(), "world goal x: %f", wx);
-        RCLCPP_INFO_ONCE(this->get_logger(), "world goal y: %f", wy);
-
-        RCLCPP_INFO_ONCE(this->get_logger(), "index goal x: %i", goal_point_.first);
-        RCLCPP_INFO_ONCE(this->get_logger(), "index goal y: %i", goal_point_.second);
-
-        tryPlanning();  
+        tryPlanning();
         response->path = path_out_;
     }
 
@@ -361,13 +388,6 @@ private:
             static_cast<int>((wx - map_.info.origin.position.x) / map_.info.resolution),
             static_cast<int>((wy - map_.info.origin.position.y) / map_.info.resolution)};
         goal_received_ = true;
-        RCLCPP_INFO_ONCE(this->get_logger(), "goal_ received");
-
-        RCLCPP_INFO_ONCE(this->get_logger(), "world goal x: %f", wx);
-        RCLCPP_INFO_ONCE(this->get_logger(), "world goal y: %f", wy);
-
-        RCLCPP_INFO_ONCE(this->get_logger(), "index goal x: %i", goal_point_.first);
-        RCLCPP_INFO_ONCE(this->get_logger(), "index goal y: %i", goal_point_.second);
 
         tryPlanning();
     }
@@ -394,13 +414,6 @@ private:
             RCLCPP_INFO(this->get_logger(), "Running A*...");
             runAStar();
         }
-    }
-
-    double heuristic_a(const std::pair<int, int> &goal, const std::pair<int, int> &current)
-    {
-        double h = std::sqrt((std::pow(goal.second - current.second, 2)) + (std::pow(goal.first - current.first, 2)));
-        // std::cout << "h: " << h << std::endl;
-        return h;
     }
 
     void runAStar()
@@ -450,11 +463,11 @@ private:
                     continue;
                 }
 
-                double new_cost = cost_so_far[x][y] + 1;
+                double new_cost = cost_so_far[x][y] + euclidian_distance(pair<int, int>{x, y}, pair<int, int>{nx, ny});
                 if (cost_so_far[nx][ny] == std::numeric_limits<double>::max() || new_cost < cost_so_far[nx][ny])
                 {
                     cost_so_far[nx][ny] = new_cost;
-                    double priority = new_cost + AStarPlanner::heuristic_a(goal, pair<int, int>{nx, ny});
+                    double priority = new_cost + euclidian_distance(goal, pair<int, int>{nx, ny});
                     frontier.push({priority, {nx, ny}});
                     came_from[nx][ny] = {x, y};
                 }
@@ -478,7 +491,6 @@ private:
             reverse(path.begin(), path.end());
         }
 
-       
         path_out_.header.frame_id = "map";
         path_out_.header.stamp = this->get_clock()->now();
         path_out_.poses.clear();
