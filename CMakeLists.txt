@@ -16,6 +16,16 @@ find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(yaml-cpp REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+find_package(rosidl_default_runtime REQUIRED)
+
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "srv/GeneratePath.srv"
+  DEPENDENCIES nav_msgs geometry_msgs
+)
+
+ament_export_libraries(${PROJECT_NAME}__rosidl_typesupport_cpp)
+
 
 add_executable(odom src/odom.cpp)
 ament_target_dependencies(odom rclcpp sensor_msgs nav_msgs geometry_msgs tf2 tf2_ros tf2_geometry_msgs)
@@ -58,6 +68,11 @@ target_link_libraries(astar_planner
   yaml-cpp
 )
 
+rosidl_target_interfaces(astar_planner
+  ${PROJECT_NAME} "rosidl_typesupport_cpp"
+)
+ament_export_dependencies(rosidl_default_runtime)
+
 install(TARGETS
   astar_planner
   DESTINATION lib/${PROJECT_NAME})
@@ -90,7 +105,7 @@ install(TARGETS
   DESTINATION lib/${PROJECT_NAME})
 
 
-  add_executable(map_viewer_astar src/map_viewer_astar.cpp)
+add_executable(map_viewer_astar src/map_viewer_astar.cpp)
 
 target_link_libraries(map_viewer_astar
     sfml-system
