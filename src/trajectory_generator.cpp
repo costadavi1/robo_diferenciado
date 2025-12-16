@@ -11,6 +11,7 @@
 #include <geometry_msgs/msg/point.hpp>
 #include <Eigen/Dense>
 #include "robo_diferenciado/action/follow_path.hpp"
+#include "robo_diferenciado/srv/generate_path.hpp"
 
 
 using namespace std::chrono_literals;
@@ -20,6 +21,14 @@ class TrajectoryGenerator : public rclcpp::Node
 public:
     using FollowPath = robo_diferenciado::action::FollowPath;
     using GoalHandlePathFollower = rclcpp_action::ClientGoalHandle<FollowPath>;
+    enum class PlannerState
+    {
+    IDLE,
+    REQUESTING_PATH,
+    WAITING_FOR_PATH,
+    HAVE_PATH,
+    FOLLOWING_PATH
+    };
 
     TrajectoryGenerator()
         : Node("trajectory_generator_node")
@@ -27,12 +36,72 @@ public:
 
         this->client_ptr_ = rclcpp_action::create_client<FollowPath>(this, "follow_path");
         this->path_pub_ = this->create_publisher<nav_msgs::msg::Path>("generated_path", 10);
+        this->a_star_client_ = this->create_client<robo_diferenciado::srv::GeneratePath>("generate_path");
 
         this->timer_ = this->create_wall_timer(
             std::chrono::seconds(1),
             std::bind(&TrajectoryGenerator::send_goal, this));
     }
 private:
+
+
+    void request_path()
+    {
+        if (!a_star_client_->wait_for_service(std::chrono::seconds(0))) {
+            RCLCPP_WARN(get_logger(), "A* service not available");
+            return;
+        }
+
+        auto request =
+            std::make_shared<robo_diferenciado::srv::GeneratePath::Request>();
+        double goal_x_ = 2.0;
+        double goal_y_ = 0.0;
+        request->x = goal_x_;
+        request->y = goal_y_;
+
+        a_star_client_->async_send_request(
+            request,
+            std::bind(
+            &TrajectoryGenerator::on_path_received,
+            this,
+            std::placeholders::_1));
+    }
+
+    void on_path_received(
+        rclcpp::Client<robo_diferenciado::srv::GeneratePath>::SharedFuture future)
+    {
+        path_ = future.get()->path;
+
+        RCLCPP_INFO(
+            get_logger(),
+            "Path received (%zu poses)",
+            path_.poses.size());
+
+        if (path_.poses.size() < 2) {
+            RCLCPP_WARN(get_logger(), "Received path is too short");
+            state_ = PlannerState::IDLE;
+            return;
+        }
+        else
+            state_ = PlannerState::HAVE_PATH;
+    }
+
+
+
+    void handle_service_response(
+        rclcpp::Client<robo_diferenciado::srv::GeneratePath>::SharedFuture future)
+        {
+        const auto & path = future.get()->path;
+
+        RCLCPP_INFO(
+            get_logger(),
+            "Received path with %zu poses",
+            path.poses.size());
+
+        path_pub_->publish(path);
+        }
+
+
     /**
      * @brief Get the knot t object
      *
@@ -167,6 +236,32 @@ private:
 
     void send_goal()
     {
+        switch (state_)
+        {
+            case PlannerState::IDLE:
+                request_path();
+                state_ = PlannerState::WAITING_FOR_PATH;
+                RCLCPP_INFO(this->get_logger(), "Waiting for path...");
+                break;
+
+            case PlannerState::WAITING_FOR_PATH:
+            // Do nothing — wait for callback
+                break;
+
+            case PlannerState::HAVE_PATH:
+                follow_path();
+                RCLCPP_INFO(this->get_logger(), "Starting to follow path...");
+                state_ = PlannerState::FOLLOWING_PATH;
+                break;
+
+            case PlannerState::FOLLOWING_PATH:
+                RCLCPP_INFO(this->get_logger(), "Following path...");
+                // monitor progress / feedback
+                break;
+        }
+    }
+    void follow_path()
+    {
         using namespace std::placeholders;
 
         this->timer_->cancel(); // Only send once
@@ -177,53 +272,14 @@ private:
         }
 
         auto goal_msg = FollowPath::Goal();
-        auto smooth_path_msg = FollowPath::Goal();
-
-        // --- CONSTRUCT A DUMMY PATH ---
-        goal_msg.path.header.stamp = this->now();
-        goal_msg.path.header.frame_id = "odom";
-        smooth_path_msg = goal_msg;
-
-        // Point 1: (0,0)
-        auto pose1 = geometry_msgs::msg::PoseStamped();
-        pose1.pose.position.x = 0.0;
-        pose1.pose.position.y = 0.0;
-        goal_msg.path.poses.push_back(pose1);
-
-        // Point 2: (1,0) - Forward
-        auto pose2 = geometry_msgs::msg::PoseStamped();
-        pose2.pose.position.x = 1.0;
-        pose2.pose.position.y = 0.0;
-        goal_msg.path.poses.push_back(pose2);
-
-        // Point 3: (1,1) - Left
-        auto pose3 = geometry_msgs::msg::PoseStamped();
-        pose3.pose.position.x = 1.0;
-        pose3.pose.position.y = 1.0;
-        goal_msg.path.poses.push_back(pose3);
-
-        auto pose4 = geometry_msgs::msg::PoseStamped();
-        pose4.pose.position.x = 2.0;
-        pose4.pose.position.y = 1.0;
-        goal_msg.path.poses.push_back(pose4);
-
-        auto pose5 = geometry_msgs::msg::PoseStamped();
-        pose5.pose.position.x = 2.0;
-        pose5.pose.position.y = 2.0;
-        goal_msg.path.poses.push_back(pose5);
-
-        auto smooth_path = generateSpline(goal_msg.path.poses, 20);
-
-        for (const auto& pose : smooth_path) {
+        goal_msg.path = path_;
+        for (const auto& pose : path_.poses) {
             RCLCPP_INFO(this->get_logger(),
-                "Smooth Path Point: (%.2f, %.2f)",
+                "Path Point: (%.2f, %.2f)",
                 pose.pose.position.x,
                 pose.pose.position.y
             );
-            smooth_path_msg.path.poses.push_back(pose);
         }
-
-        path_pub_->publish(smooth_path_msg.path);
 
         RCLCPP_INFO(this->get_logger(), "Sending path goal...");
 
@@ -239,8 +295,86 @@ private:
         send_goal_options.result_callback =
         std::bind(&TrajectoryGenerator::result_callback, this, _1);
 
-        this->client_ptr_->async_send_goal(smooth_path_msg, send_goal_options);
+        this->client_ptr_->async_send_goal(goal_msg, send_goal_options);
     }
+
+    // {
+    //     using namespace std::placeholders;
+
+    //     this->timer_->cancel(); // Only send once
+
+    //     if (!this->client_ptr_->wait_for_action_server(std::chrono::seconds(10))) {
+    //     RCLCPP_ERROR(this->get_logger(), "Action server not available after waiting");
+    //     return;
+    //     }
+
+    //     auto goal_msg = FollowPath::Goal();
+    //     auto smooth_path_msg = FollowPath::Goal();
+
+    //     // --- CONSTRUCT A DUMMY PATH ---
+    //     goal_msg.path.header.stamp = this->now();
+    //     goal_msg.path.header.frame_id = "odom";
+    //     smooth_path_msg = goal_msg;
+
+    //     // Point 1: (0,0)
+    //     // auto pose1 = geometry_msgs::msg::PoseStamped();
+    //     // pose1.pose.position.x = 0.0;
+    //     // pose1.pose.position.y = 0.0;
+    //     // goal_msg.path.poses.push_back(pose1);
+
+    //     // // Point 2: (1,0) - Forward
+    //     // auto pose2 = geometry_msgs::msg::PoseStamped();
+    //     // pose2.pose.position.x = 1.0;
+    //     // pose2.pose.position.y = 0.0;
+    //     // goal_msg.path.poses.push_back(pose2);
+
+    //     // // Point 3: (1,1) - Left
+    //     // auto pose3 = geometry_msgs::msg::PoseStamped();
+    //     // pose3.pose.position.x = 1.0;
+    //     // pose3.pose.position.y = 1.0;
+    //     // goal_msg.path.poses.push_back(pose3);
+
+    //     // auto pose4 = geometry_msgs::msg::PoseStamped();
+    //     // pose4.pose.position.x = 2.0;
+    //     // pose4.pose.position.y = 1.0;
+    //     // goal_msg.path.poses.push_back(pose4);
+
+    //     // auto pose5 = geometry_msgs::msg::PoseStamped();
+    //     // pose5.pose.position.x = 2.0;
+    //     // pose5.pose.position.y = 2.0;
+    //     // goal_msg.path.poses.push_back(pose5);
+
+    //     auto smooth_path = generateSpline(goal_msg.path.poses, 20);
+
+    //     call_service();
+
+    //     for (const auto& pose : smooth_path) {
+    //         RCLCPP_INFO(this->get_logger(),
+    //             "Smooth Path Point: (%.2f, %.2f)",
+    //             pose.pose.position.x,
+    //             pose.pose.position.y
+    //         );
+    //         smooth_path_msg.path.poses.push_back(pose);
+    //     }
+
+    //     path_pub_->publish(smooth_path_msg.path);
+
+    //     RCLCPP_INFO(this->get_logger(), "Sending path goal...");
+
+    //     auto send_goal_options = rclcpp_action::Client<FollowPath>::SendGoalOptions();
+
+    //     // Define the 3 callbacks: Response, Feedback, Result
+    //     send_goal_options.goal_response_callback =
+    //     std::bind(&TrajectoryGenerator::goal_response_callback, this, _1);
+
+    //     send_goal_options.feedback_callback =
+    //     std::bind(&TrajectoryGenerator::feedback_callback, this, _1, _2);
+
+    //     send_goal_options.result_callback =
+    //     std::bind(&TrajectoryGenerator::result_callback, this, _1);
+
+    //     this->client_ptr_->async_send_goal(smooth_path_msg, send_goal_options);
+    // }
 
     // Callback 1: Server accepted or rejected the goal?
     void goal_response_callback(const GoalHandlePathFollower::SharedPtr & goal_handle)
@@ -287,7 +421,11 @@ private:
 
     rclcpp_action::Client<FollowPath>::SharedPtr client_ptr_;
     rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
+    rclcpp::Client<robo_diferenciado::srv::GeneratePath>::SharedPtr a_star_client_;
     rclcpp::TimerBase::SharedPtr timer_;
+    nav_msgs::msg::Path path_;
+
+    PlannerState state_ = PlannerState::IDLE;
 };
 
 int main(int argc, char **argv)

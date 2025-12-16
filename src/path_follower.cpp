@@ -105,6 +105,8 @@ private:
       // Get the next waypoint
       geometry_msgs::msg::Pose next_waypoint = goal->path.poses[i].pose;
       // Calculate distance between current and next waypoints
+      RCLCPP_INFO(this->get_logger(), "Moving to waypoint %zu: x=%.2f, y=%.2f",
+                  i, next_waypoint.position.x, next_waypoint.position.y);
       double dx_waypoints = next_waypoint.position.x - current_waypoint.position.x;
       double dy_waypoints = next_waypoint.position.y - current_waypoint.position.y;
       double distance_waypoints = std::sqrt(dx_waypoints * dx_waypoints + dy_waypoints * dy_waypoints);
@@ -148,7 +150,7 @@ private:
           cmd_msg.twist.linear.x = speed_signal > speed_limit_ ? speed_limit_ : speed_signal;
 
           // cmd_msg.twist.angular.z = k_angular * std::atan2(lookahead_y, lookahead_x);
-          cmd_msg.twist.angular.z = cmd_msg.twist.linear.x * (2.0 * lookahead_y) / (lookahead_distance_ * lookahead_distance_);
+          // cmd_msg.twist.angular.z = cmd_msg.twist.linear.x * (2.0 * lookahead_y) / (lookahead_distance_ * lookahead_distance_);
           cmd_msg.header.stamp = this->now();
 
           // Publish command
