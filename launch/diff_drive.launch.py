@@ -95,7 +95,7 @@ def generate_launch_description():
         ],
         output='screen'
     )
-    # Example static transform: map -> base_link
+
     static_tf = Node(
     package='tf2_ros',
     executable='static_transform_publisher',
@@ -164,6 +164,20 @@ def generate_launch_description():
         ]
     )
 
+    map_path = os.path.join(pkg_project_description, 'map')
+    astar_config = os.path.join(pkg_project_description, 'config', 'astar_planner.yaml')
+
+    astar_node = Node(
+        package='robo_diferenciado',
+        executable='astar_planner',
+        output='screen',
+        parameters=[
+            {'use_sim_time': True},
+            {'map_path': map_path},
+            astar_config
+        ]
+    )
+
     delay_joint_state_broadcaster_after_robot_controller_spawner = RegisterEventHandler(
         event_handler=OnProcessExit(
             target_action=diff_drive_controller_spawner,
@@ -205,6 +219,7 @@ def generate_launch_description():
         odom_node,
         diff_drive_controller_spawner,
         delay_joint_state_broadcaster_after_robot_controller_spawner,
+        astar_node,
         # map_server_node,
         # lifecycle_node,
     ])
