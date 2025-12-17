@@ -9,7 +9,6 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 find_package(ament_cmake REQUIRED)
-find_package(xacro REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(geometry_msgs REQUIRED)
@@ -18,12 +17,10 @@ find_package(nav_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
-find_package(tf2_geometry_msgs REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(rosidl_default_runtime REQUIRED)
 find_package(Eigen3 REQUIRED)
-find_package(SFML 2.5 COMPONENTS graphics window system REQUIRED)
 
 
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -49,28 +46,6 @@ add_executable(astar_planner src/astar_planner.cpp)
 ament_target_dependencies(astar_planner rclcpp nav_msgs geometry_msgs)
 target_link_libraries(astar_planner
   yaml-cpp
-)
-
-add_executable(map_reader src/map_reader.cpp)
-ament_target_dependencies(map_reader ament_cmake rclcpp nav_msgs)
-target_link_libraries(map_reader
-  yaml-cpp
-)
-
-
-
-add_executable(map_viewer src/map_viewer.cpp)
-target_link_libraries(map_viewer
-    sfml-system
-    sfml-window
-    sfml-graphics
-)
-
-add_executable(map_viewer_astar src/map_viewer_astar.cpp)
-target_link_libraries(map_viewer_astar
-    sfml-system
-    sfml-window
-    sfml-graphics
 )
 
 rosidl_get_typesupport_target(cpp_typesupport_target
@@ -99,9 +74,6 @@ install(TARGETS
   trajectory_generator
   path_follower
   astar_planner
-  map_reader
-  map_viewer
-  map_viewer_astar
   DESTINATION lib/${PROJECT_NAME}
 )
 

@@ -111,7 +111,6 @@ std::vector<int8_t> ConvertPGM(
     double occupied_thresh,
     double free_thresh)
 {
-    // std::vector<uint8_t> img(image.width * image.height);
     std::vector<int8_t> data(image.width * image.height);
     for (int y = 0; y < image.height; y++)
     {
@@ -163,7 +162,6 @@ MapMetaData loadYaml(const std::string &yaml_file)
 double euclidian_distance(const std::pair<int, int> &goal, const std::pair<int, int> &current)
 {
     double h = std::sqrt((std::pow(goal.second - current.second, 2)) + (std::pow(goal.first - current.first, 2)));
-    // std::cout << "h: " << h << std::endl;
     return h;
 }
 
@@ -194,7 +192,6 @@ nav_msgs::msg::OccupancyGrid inflateOccupancyGrid(
     const auto &in = input.data;
     auto &out = output.data;
 
-    // Começa com tudo livre
     out.assign(in.begin(), in.end());
 
     for (int y = 0; y < height; ++y)
@@ -203,7 +200,6 @@ nav_msgs::msg::OccupancyGrid inflateOccupancyGrid(
         {
             int idx = y * width + x;
 
-            // Trata obstáculo e desconhecido como obstáculo
             if (in[idx] == 100 || in[idx] == -1)
             {
                 for (int dy = -R; dy <= R; ++dy)
@@ -252,7 +248,6 @@ public:
 
         map_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/map", 10);
 
-        // map_received_ = importMap("/home/davi/project_ws/src/robo_diferenciado/map/map.yaml", "/home/davi/project_ws/src/robo_diferenciado/map/map.pgm");
         map_received_ = importMap();
     }
 
@@ -348,7 +343,6 @@ private:
     }
 
     bool importMap()
-    // bool importMap(const std::string &yaml_path, const std::string &pgm_path)
     {
         MapMetaData meta_data;
         try
