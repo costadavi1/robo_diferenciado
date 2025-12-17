@@ -2,6 +2,52 @@
     <!-- Draw Circle -->
     <model name='ros_symbol'>
       <static>1</static>
+
+    <link name="chao">
+
+      <collision name="chao">
+        <geometry>
+          <plane>
+            <normal>0 0 1</normal>
+            <size>100 100</size>
+          </plane>
+        </geometry>
+
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.3</mu>
+              <mu2>0.3</mu2>
+              <slip1>0.05</slip1>
+              <slip2>0.05</slip2>
+            </ode>
+          </friction>
+
+          <contact>
+            <ode>
+              <kp>100000</kp>
+              <kd>1</kd>
+            </ode>
+          </contact>
+        </surface>
+      </collision>
+
+      <visual name="chao">
+        <geometry>
+          <plane>
+            <normal>0 0 1</normal>
+            <size>100 100</size>
+          </plane>
+        </geometry>
+
+        <material>
+          <ambient>0.5 0.5 0.5 1</ambient>
+          <diffuse>0.5 0.5 0.5 1</diffuse>
+        </material>
+      </visual>
+
+    </link>
+  
       <link name='symbol'>
         <collision name='one_one'>
           <pose>-1.1 -1.1 0.25 0 0 0</pose>
