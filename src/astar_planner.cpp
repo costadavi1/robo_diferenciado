@@ -515,11 +515,11 @@ private:
 
             pose.pose.position.x =
                 map_.info.origin.position.x +
-                (x)*map_.info.resolution;
+                (x + 1)*map_.info.resolution;
 
             pose.pose.position.y =
                 map_.info.origin.position.y +
-                (y)*map_.info.resolution;
+                (y + 1)*map_.info.resolution;
 
             pose.pose.position.x -= start_pos_x_;
             pose.pose.position.y -= start_pos_y_;
